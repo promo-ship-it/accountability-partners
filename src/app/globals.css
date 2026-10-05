@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-slate-50 text-ink antialiased;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50;
+}
+.btn-primary {
+  @apply btn bg-brand-600 text-white hover:bg-brand-700;
+}
+.btn-ghost {
+  @apply btn bg-white text-ink ring-1 ring-slate-200 hover:bg-slate-50;
+}
+.card {
+  @apply rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100;
+}
+.label {
+  @apply block text-sm font-medium text-slate-700;
+}
+.input {
+  @apply mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
+}

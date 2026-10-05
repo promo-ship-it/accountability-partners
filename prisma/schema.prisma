@@ -1,0 +1,615 @@
+// Accountability Partners — data model.
+// Domain-neutral goal-achievement core + fitness/wellness V1 specifics.
+// Every customer-owned row carries userId for backend-enforced ownership.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Identity & lifecycle
+// ---------------------------------------------------------------------------
+
+enum AccountState {
+  registered
+  onboarding
+  trial
+  active
+  payment_failed
+  canceled
+  expired
+  suspended
+  deleted
+}
+
+enum Role {
+  customer
+  admin
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  passwordHash String
+  role         Role         @default(customer)
+  state        AccountState @default(registered)
+  timezone     String       @default("UTC")
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  deletedAt    DateTime?
+
+  profile                 Profile?
+  goals                   Goal[]
+  commitments             Commitment[]
+  habits                  Habit[]
+  checkIns                CheckIn[]
+  progressRecords         ProgressRecord[]
+  behavioralObservations  BehavioralObservation[]
+  barriers                Barrier[]
+  strategies              Strategy[]
+  aiInteractions          AiInteraction[]
+  aiMemories              AiMemory[]
+  aiUsage                 AiUsage[]
+  notifications           Notification[]
+  notificationPreference  NotificationPreference?
+  subscription            Subscription?
+  entitlements            Entitlement[]
+  events                  Event[]
+  challenges              Challenge[]
+  achievements            Achievement[]
+  sessions                Session[]
+  auditLogs               AuditLog[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Behavioral profile (stable identity + preferences)
+// ---------------------------------------------------------------------------
+
+enum AccountabilityStyle {
+  supportive
+  encouraging
+  direct
+  challenging
+  structured
+  reflective
+  motivational
+  firm
+}
+
+model Profile {
+  id                   String              @id @default(cuid())
+  userId               String              @unique
+  user                 User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName          String?
+  // Customer-confirmed identity info (source-of-truth tier 1).
+  motivations          String?
+  values               String?
+  routines             String?
+  accountabilityStyle  AccountabilityStyle @default(supportive)
+  // The style the system currently believes works best (AI inference tier).
+  learnedStyle         AccountabilityStyle?
+  communicationNotes   String?
+  availabilityNotes    String?
+  onboardingCompleted  Boolean             @default(false)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Goal engine (domain-neutral, first-class objects)
+// ---------------------------------------------------------------------------
+
+enum GoalCategory {
+  fitness
+  weight
+  strength
+  activity
+  nutrition
+  wellness
+  habit
+  // Future domains architected, not activated in V1:
+  career
+  education
+  finance
+  entrepreneurship
+  personal
+  lifestyle
+  other
+}
+
+enum GoalStatus {
+  active
+  paused
+  achieved
+  abandoned
+}
+
+model Goal {
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  statement   String
+  category    GoalCategory @default(fitness)
+  whyItMatters String?
+  baseline    String?
+  target      String?
+  unit        String?
+  targetDate  DateTime?
+  status      GoalStatus   @default(active)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  milestones  Milestone[]
+  actions     Action[]
+  commitments Commitment[]
+  habits      Habit[]
+  progressRecords ProgressRecord[]
+  barriers    Barrier[]
+
+  @@index([userId])
+  @@index([userId, status])
+}
+
+model Milestone {
+  id          String   @id @default(cuid())
+  goalId      String
+  goal        Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  title       String
+  targetDate  DateTime?
+  achievedAt  DateTime?
+  orderIndex  Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([goalId])
+}
+
+model Action {
+  id          String   @id @default(cuid())
+  goalId      String
+  goal        Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  description String
+  done        Boolean  @default(false)
+  orderIndex  Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([goalId])
+}
+
+// ---------------------------------------------------------------------------
+// Commitments (the accountability unit) + habits
+// ---------------------------------------------------------------------------
+
+enum CommitmentStatus {
+  scheduled
+  completed
+  missed
+  skipped
+}
+
+model Commitment {
+  id          String           @id @default(cuid())
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goalId      String?
+  goal        Goal?            @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  description String
+  dueAt       DateTime
+  status      CommitmentStatus @default(scheduled)
+  // How this commitment came to be — reinforces customer-ownership tracking.
+  proposedByAi Boolean         @default(false)
+  completedAt DateTime?
+  missReason  String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  checkIns    CheckIn[]
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([dueAt])
+}
+
+enum HabitCadence {
+  daily
+  weekly
+  custom
+}
+
+model Habit {
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goalId      String?
+  goal        Goal?        @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  description String
+  cadence     HabitCadence @default(daily)
+  targetPerWeek Int        @default(7)
+  currentStreak Int        @default(0)
+  longestStreak Int        @default(0)
+  active      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Check-ins & progress
+// ---------------------------------------------------------------------------
+
+model CheckIn {
+  id           String      @id @default(cuid())
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commitmentId String?
+  commitment   Commitment? @relation(fields: [commitmentId], references: [id], onDelete: SetNull)
+  completed    Boolean
+  mood         Int?        // 1-5 optional self-report
+  note         String?
+  createdAt    DateTime    @default(now())
+
+  @@index([userId])
+  @@index([userId, createdAt])
+}
+
+model ProgressRecord {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goalId    String?
+  goal      Goal?    @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  metric    String   // e.g. "weight", "workouts_completed", custom
+  value     Float
+  unit      String?
+  recordedAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, metric])
+}
+
+// ---------------------------------------------------------------------------
+// Behavioral intelligence: observations, barriers, strategies
+// Source-of-truth tiers are explicit via `tier`.
+// ---------------------------------------------------------------------------
+
+enum TruthTier {
+  customer_confirmed  // tier 1
+  app_recorded        // tier 2
+  observed            // tier 3
+  ai_inference        // tier 4
+  ai_hypothesis       // tier 5
+}
+
+enum Confidence {
+  low
+  medium
+  high
+}
+
+model BehavioralObservation {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  summary       String     // "Evening commitments are frequently missed"
+  evidence      String?    // "7 of last 10 evening commitments missed"
+  tier          TruthTier  @default(observed)
+  confidence    Confidence @default(medium)
+  customerConfirmed Boolean? // null = pending, true/false = reviewed
+  active        Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([userId])
+  @@index([userId, active])
+}
+
+model Barrier {
+  id          String     @id @default(cuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goalId      String?
+  goal        Goal?      @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  description String
+  recurring   Boolean    @default(false)
+  tier        TruthTier  @default(observed)
+  resolved    Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+
+  @@index([userId])
+}
+
+enum StrategyOutcome {
+  untested
+  working
+  not_working
+}
+
+model Strategy {
+  id          String          @id @default(cuid())
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  description String
+  outcome     StrategyOutcome @default(untested)
+  createdAt   DateTime        @default(now())
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// AI: interactions, memory, usage/observability
+// ---------------------------------------------------------------------------
+
+model AiInteraction {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  capability    String
+  model         String
+  promptVersion String
+  // We avoid storing full private conversation content; summaries only.
+  summary       String?
+  validationOk  Boolean  @default(true)
+  safetyOk      Boolean  @default(true)
+  usedFallback  Boolean  @default(false)
+  correlationId String?
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, capability])
+}
+
+enum MemoryKind {
+  identity
+  goal
+  behavioral
+  preference
+  interaction
+  ephemeral
+  system
+}
+
+model AiMemory {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      MemoryKind
+  key       String
+  value     String
+  tier      TruthTier  @default(ai_inference)
+  // Lifecycle: ephemeral memory expires; others persist until purged.
+  expiresAt DateTime?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([userId, kind, key])
+  @@index([userId, kind])
+}
+
+model AiUsage {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  capability    String
+  model         String
+  promptTokens  Int      @default(0)
+  completionTokens Int   @default(0)
+  estimatedCostUsd Float @default(0)
+  latencyMs     Int      @default(0)
+  day           String   // YYYY-MM-DD for fast daily aggregation
+  month         String   // YYYY-MM
+  createdAt     DateTime @default(now())
+
+  @@index([userId, day])
+  @@index([userId, month])
+  @@index([day])
+}
+
+// ---------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------
+
+enum NotificationChannel {
+  in_app
+  email
+  sms
+  push
+}
+
+enum NotificationStatus {
+  pending
+  sent
+  failed
+  read
+}
+
+model Notification {
+  id        String              @id @default(cuid())
+  userId    String
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel   NotificationChannel @default(in_app)
+  template  String
+  title     String
+  body      String
+  status    NotificationStatus  @default(pending)
+  attempts  Int                 @default(0)
+  // Idempotency: prevents duplicate sends for the same logical event.
+  dedupeKey String?             @unique
+  sentAt    DateTime?
+  readAt    DateTime?
+  createdAt DateTime            @default(now())
+
+  @@index([userId])
+  @@index([userId, status])
+}
+
+model NotificationPreference {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inApp       Boolean  @default(true)
+  email       Boolean  @default(true)
+  sms         Boolean  @default(false)
+  push        Boolean  @default(false)
+  quietHoursStart Int? // 0-23 local hour
+  quietHoursEnd   Int?
+  maxPerDay   Int      @default(5)
+  consentedAt DateTime?
+  updatedAt   DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Billing: subscription (Stripe mirror) + entitlement engine
+// ---------------------------------------------------------------------------
+
+enum SubscriptionStatus {
+  trialing
+  active
+  past_due
+  canceled
+  incomplete
+  none
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  userId               String             @unique
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeCustomerId     String?            @unique
+  stripeSubscriptionId String?            @unique
+  status               SubscriptionStatus @default(none)
+  priceId              String?
+  trialEndsAt          DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+}
+
+// Entitlements are decoupled from billing status so pricing can change
+// without touching billing code.
+model Entitlement {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  feature   String   // "ai_accountability", "progress", "human_coaching"...
+  enabled   Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, feature])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Events (domain / analytics / integration), jobs, feature flags, audit
+// ---------------------------------------------------------------------------
+
+enum EventClass {
+  domain
+  analytics
+  integration
+}
+
+model Event {
+  id            String     @id @default(cuid())
+  userId        String?
+  user          User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  class         EventClass @default(domain)
+  type          String     // "commitment.missed", "trial.started"...
+  version       Int        @default(1)
+  entity        String?
+  actor         String?    // "customer" | "system" | "ai"
+  metadata      String?    // JSON
+  correlationId String?
+  createdAt     DateTime   @default(now())
+
+  @@index([type])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+enum JobStatus {
+  pending
+  running
+  succeeded
+  failed
+}
+
+model Job {
+  id          String    @id @default(cuid())
+  type        String
+  payload     String?   // JSON
+  status      JobStatus @default(pending)
+  runAt       DateTime  @default(now())
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+  lastError   String?
+  // Idempotency key: same logical job won't be enqueued/run twice.
+  dedupeKey   String?   @unique
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status, runAt])
+}
+
+model FeatureFlag {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  description String?
+  enabled     Boolean  @default(false)
+  // Optional per-customer scoping stored as JSON array of userIds.
+  scopeUserIds String?
+  updatedAt   DateTime @updatedAt
+}
+
+model Challenge {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  startsAt    DateTime @default(now())
+  endsAt      DateTime?
+  completed   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Achievement {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key       String
+  title     String
+  earnedAt  DateTime @default(now())
+
+  @@unique([userId, key])
+  @@index([userId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action    String   // "ai.kill_switch.enabled", "user.suspended"...
+  target    String?
+  metadata  String?  // JSON
+  createdAt DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+}

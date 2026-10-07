@@ -8,6 +8,7 @@ import { sendNotification } from '@/modules/notifications/service';
 import { detectDisengagement } from '@/modules/behavioral/disengagement';
 import { trialExpired } from '@/modules/billing/trial';
 import { emitEvent } from '@/modules/events';
+import { brand } from '@/lib/brand';
 
 type Payload = Record<string, unknown>;
 
@@ -18,7 +19,7 @@ export async function handleJob(type: string, payload: Payload): Promise<void> {
         userId: String(payload.userId),
         channel: (payload.channel as 'in_app' | 'email') ?? 'in_app',
         template: String(payload.template ?? 'generic'),
-        title: String(payload.title ?? 'Accountability Partners'),
+        title: String(payload.title ?? brand.name),
         body: String(payload.body ?? ''),
         dedupeKey: payload.dedupeKey ? String(payload.dedupeKey) : undefined,
       });

@@ -42,6 +42,38 @@ The hourly cron enqueues `trial_expiry_check`; expired trials with no active
 subscription move to `expired` state and lose access — **data is retained**
 (spec §41, §55) so the customer can resume by subscribing.
 
+## Customer-facing naming (brand) & multiple projects
+
+All **app-side** customer-facing naming comes from one place — `src/lib/brand.ts`,
+driven by env vars `BRAND_NAME`, `BRAND_STATEMENT_DESCRIPTOR`,
+`BRAND_SUPPORT_EMAIL`. Checkout product label/metadata, success/cancel pages,
+emails, page titles, headers, and the support link all read from it. **To
+rename the project later: change these env vars and redeploy — no code edits.**
+Each separate project/deployment sets its own values, so they stay divided.
+
+### Stripe-side branding (set in the Stripe Dashboard, not code)
+
+Some customer-facing branding is **account-level** in Stripe and must be set in
+the dashboard for the account this project uses:
+
+- Business name + logo + colors on the Checkout page.
+- Statement descriptor (what shows on card statements).
+- Business name + support email on receipts/invoices.
+- Product name on the invoice line (name the Stripe **Product**
+  "Accountability Partners — Membership"; the app also sends this as the
+  subscription description + metadata).
+
+### One account vs. multiple projects
+
+If you run several projects on **one** Stripe account, the account-level items
+above (checkout branding, statement descriptor, receipt business name) are
+**shared** — only the Product name and the per-charge description differ. For
+truly per-project customer-facing identity (distinct checkout branding,
+statement descriptor, payouts, dashboards), use a **separate Stripe account per
+project** and point that project's `STRIPE_*` env vars at it. The app tags every
+Stripe customer + subscription with `brand` metadata so this project's records
+are identifiable even inside a shared account.
+
 ## Required Stripe setup
 
 1. Create a Product + a $35/month recurring Price → `STRIPE_PRICE_ID`.

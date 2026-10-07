@@ -1,11 +1,12 @@
 import Link from 'next/link';
 import { PRICE_USD, TRIAL_DAYS } from '@/modules/billing/trial';
+import { brand } from '@/lib/brand';
 
 export default function LandingPage() {
   return (
     <main className="mx-auto max-w-5xl px-5">
       <header className="flex items-center justify-between py-6">
-        <span className="text-lg font-bold text-brand-700">Accountability Partners</span>
+        <span className="text-lg font-bold text-brand-700">{brand.name}</span>
         <nav className="flex items-center gap-3 text-sm">
           <Link href="/login" className="font-medium text-slate-600 hover:text-ink">
             Log in
@@ -77,10 +78,10 @@ export default function LandingPage() {
 
       <footer className="border-t border-slate-200 py-8 text-center text-sm text-slate-500">
         <p>
-          Accountability Partners is a wellness coaching tool, not a medical service. It does not
+          {brand.name} is a wellness coaching tool, not a medical service. It does not
           diagnose or treat conditions.
         </p>
-        <p className="mt-2">© {new Date().getFullYear()} Accountability Partners</p>
+        <p className="mt-2">© {new Date().getFullYear()} {brand.name}</p>
       </footer>
     </main>
   );

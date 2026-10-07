@@ -29,6 +29,9 @@ Copy `.env.example` → `.env` (local) or set in Vercel. Validated at startup by
 | `EMAIL_FROM` | yes | From address. |
 | `CRON_SECRET` | yes | Bearer token the cron scheduler must send. |
 | `ADMIN_EMAILS` | yes | Comma-separated admin emails for `/admin`. |
+| `BRAND_NAME` | yes | Customer-facing project name. Rename = change this + redeploy. |
+| `BRAND_STATEMENT_DESCRIPTOR` | yes | ≤22 chars; sent on Stripe charges (card statement). |
+| `BRAND_SUPPORT_EMAIL` | yes | Support contact shown to customers. |
 
 ## Credentials still required to go fully live
 

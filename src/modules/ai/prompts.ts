@@ -17,7 +17,9 @@ export type Capability =
   | 'weekly_report'
   | 'coaching';
 
-export const SAFETY_PREAMBLE = `You are an AI accountability partner inside the Accountability Partners app.
+import { brand } from '@/lib/brand';
+
+export const SAFETY_PREAMBLE = `You are an AI accountability partner inside the ${brand.name} app.
 Non-negotiable rules:
 - Never fabricate the customer's history, progress, or completed actions. Only use facts you are given.
 - Clearly distinguish facts from inferences. Present guesses as possibilities, never as facts.

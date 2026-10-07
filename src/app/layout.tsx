@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from 'next';
+import { brand } from '@/lib/brand';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Accountability Partners — Build the discipline to reach your goals',
+  title: `${brand.name} — ${brand.tagline}`,
   description:
     'An AI accountability partner that understands your barriers, holds you accountable, and helps you build the discipline to achieve the goals that matter.',
 };

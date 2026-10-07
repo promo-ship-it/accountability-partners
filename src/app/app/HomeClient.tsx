@@ -21,7 +21,7 @@ interface HomeData {
   unreadNotifs: number;
 }
 
-export default function HomeClient({ data, email }: { data: HomeData; email: string }) {
+export default function HomeClient({ data, brandName }: { data: HomeData; brandName: string }) {
   const router = useRouter();
   const [partnerMsg, setPartnerMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -82,7 +82,7 @@ export default function HomeClient({ data, email }: { data: HomeData; email: str
   return (
     <main className="mx-auto max-w-2xl px-5 pb-20">
       <header className="flex items-center justify-between py-5">
-        <span className="font-bold text-brand-700">Accountability Partners</span>
+        <span className="font-bold text-brand-700">{brandName}</span>
         <div className="flex items-center gap-3 text-sm">
           <a href="/app/account" className="text-slate-600 hover:text-ink">Account</a>
           <button onClick={logout} className="text-slate-600 hover:text-ink">Log out</button>

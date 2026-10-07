@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function AccountClient({ email, status }: { email: string; status: string }) {
+export default function AccountClient({ email, status, supportEmail }: { email: string; status: string; supportEmail: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -64,7 +64,7 @@ export default function AccountClient({ email, status }: { email: string; status
       <div className="card mt-4">
         <h2 className="font-semibold">Need help?</h2>
         <p className="mt-2 text-sm text-slate-600">
-          Email <a className="text-brand-600" href="mailto:support@accountabilitypartners.app">support@accountabilitypartners.app</a> to report a problem,
+          Email <a className="text-brand-600" href={`mailto:${supportEmail}`}>{supportEmail}</a> to report a problem,
           request help, or flag inappropriate AI behavior.
         </p>
       </div>

@@ -46,6 +46,12 @@ const schema = z.object({
 
   CRON_SECRET: z.string().default('dev-cron-secret'),
   ADMIN_EMAILS: z.string().default(''),
+
+  // Brand (customer-facing naming). Single source of truth; rename = change
+  // these + redeploy. See src/lib/brand.ts.
+  BRAND_NAME: z.string().default('Accountability Partners'),
+  BRAND_STATEMENT_DESCRIPTOR: z.string().max(22).default('ACCTPARTNERS'),
+  BRAND_SUPPORT_EMAIL: z.string().default('support@accountabilitypartners.app'),
 });
 
 export const env = schema.parse(process.env);

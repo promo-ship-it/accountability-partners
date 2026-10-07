@@ -43,3 +43,11 @@ every goal category.
 4. **Email reminders live** (Resend) — flip `EMAIL_PROVIDER=resend`.
 5. **Human-coach escalation MVP** — surface level-5 escalations to the admin.
 6. **Second goal domain** (e.g. finance) to prove the domain-neutral core.
+
+## Parked (add-if-needed)
+
+- **Per-minute AI rate limit** — smooths burst calls from a single user. Not a
+  cost or security need: spend is already boxed in by the per-customer
+  daily/monthly caps, the global daily ceiling, and the 20% dollar budget. Its
+  only real benefit is latency/UX under bursty usage. Add later ONLY if the
+  admin usage data shows burst behavior.

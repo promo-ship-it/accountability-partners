@@ -12,6 +12,17 @@ interface Stats {
 interface Customer { id: string; email: string; state: string; subscriptionStatus: string; goals: number; commitments: number; }
 interface Flag { id: string; key: string; enabled: boolean; description: string | null; }
 interface Audit { id: string; action: string; target: string | null; createdAt: string; }
+interface Budget {
+  enabled: boolean;
+  pct: number;
+  perCustomerCapUsd: number;
+  poolCapUsd: number;
+  poolSpendUsd: number;
+  poolUsedPct: number;
+  activeCustomers: number;
+}
+
+const PCT_OPTIONS = [10, 15, 20, 25];
 
 const KILL_SWITCHES = [
   { key: 'ai_kill_switch', label: 'Disable ALL AI' },
@@ -23,27 +34,53 @@ const KILL_SWITCHES = [
 export default function AdminClient({
   initial,
 }: {
-  initial: { stats: Stats; customers: Customer[]; flags: Flag[]; audit: Audit[] };
+  initial: { stats: Stats; customers: Customer[]; flags: Flag[]; audit: Audit[]; budget: Budget };
 }) {
   const [flags, setFlags] = useState<Flag[]>(initial.flags);
   const [customers, setCustomers] = useState<Customer[]>(initial.customers);
+  const [budget, setBudget] = useState<Budget>(initial.budget);
   const { stats, audit } = initial;
 
   const flagOn = (key: string) => flags.find((f) => f.key === key)?.enabled ?? false;
 
-  async function toggleFlag(key: string, enabled: boolean) {
+  async function postFlag(key: string, enabled: boolean) {
     const res = await fetch('/api/admin/flags', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key, enabled }),
     });
-    if ((await res.json()).ok) {
+    return (await res.json()).ok as boolean;
+  }
+
+  async function toggleFlag(key: string, enabled: boolean) {
+    if (await postFlag(key, enabled)) {
       setFlags((prev) => {
         const exists = prev.find((f) => f.key === key);
         if (exists) return prev.map((f) => (f.key === key ? { ...f, enabled } : f));
         return [...prev, { id: key, key, enabled, description: null }];
       });
     }
+  }
+
+  async function setBudgetPct(pct: number) {
+    // Enable the chosen pct flag; disable all other pct flags so only one wins.
+    for (const p of PCT_OPTIONS) {
+      if (p !== pct) await postFlag(`ai_budget_pct_${p}`, false);
+    }
+    await postFlag(`ai_budget_pct_${pct}`, true);
+    const cap = (pct / 100) * stats.revenue.pricePerCustomer;
+    setBudget((b) => ({
+      ...b,
+      pct,
+      perCustomerCapUsd: Math.round(cap * 100) / 100,
+      poolCapUsd: Math.round(cap * b.activeCustomers * 100) / 100,
+    }));
+  }
+
+  async function setBudgetEnabled(enabled: boolean) {
+    // "disabled" flag is the inverse: enabling budget = clearing ai_budget_disabled.
+    await postFlag('ai_budget_disabled', !enabled);
+    setBudget((b) => ({ ...b, enabled }));
   }
 
   async function suspend(id: string, action: 'suspend' | 'unsuspend') {
@@ -84,6 +121,51 @@ export default function AdminClient({
           <div><div className="text-slate-500">AI cost</div><div className="font-semibold">${stats.unitEconomics.aiCostPerCustomer}</div></div>
           <div><div className="text-slate-500">Payment fees</div><div className="font-semibold">${stats.unitEconomics.paymentFeePerCustomer}</div></div>
           <div><div className="text-slate-500">Gross margin</div><div className="font-semibold text-ok">${stats.unitEconomics.grossMarginPerCustomer}</div></div>
+        </div>
+      </section>
+
+      {/* AI budget */}
+      <section className="card mt-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">AI budget</h2>
+          <label className="flex items-center gap-2 text-sm">
+            <span>{budget.enabled ? 'On' : 'Off'}</span>
+            <input type="checkbox" checked={budget.enabled} onChange={(e) => setBudgetEnabled(e.target.checked)} />
+          </label>
+        </div>
+        <p className="text-sm text-slate-500">
+          Caps AI cost at a % of the ${stats.revenue.pricePerCustomer}/mo price — per customer and pooled. Changes apply live.
+        </p>
+
+        <div className="mt-3 flex items-center gap-3">
+          <span className="text-sm text-slate-600">Cap %</span>
+          <select
+            className="input mt-0 w-24"
+            value={budget.pct}
+            disabled={!budget.enabled}
+            onChange={(e) => setBudgetPct(Number(e.target.value))}
+          >
+            {PCT_OPTIONS.map((p) => <option key={p} value={p}>{p}%</option>)}
+          </select>
+          <span className="text-sm text-slate-500">
+            = ${budget.perCustomerCapUsd}/customer · ${budget.poolCapUsd} pool ({budget.activeCustomers} active)
+          </span>
+        </div>
+
+        <div className="mt-4">
+          <div className="flex justify-between text-xs text-slate-500">
+            <span>Pool used this month</span>
+            <span>${budget.poolSpendUsd} of ${budget.poolCapUsd} ({budget.poolUsedPct}%)</span>
+          </div>
+          <div className="mt-1 h-3 w-full overflow-hidden rounded-full bg-slate-100">
+            <div
+              className={`h-full rounded-full ${budget.poolUsedPct >= 90 ? 'bg-bad' : budget.poolUsedPct >= 70 ? 'bg-warn' : 'bg-ok'}`}
+              style={{ width: `${budget.poolUsedPct}%` }}
+            />
+          </div>
+          <p className="mt-2 text-xs text-slate-400">
+            At the cap, AI falls back to free built-in responses (app stays fully functional); resets at month start.
+          </p>
         </div>
       </section>
 

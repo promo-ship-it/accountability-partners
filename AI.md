@@ -39,6 +39,26 @@ Env-configurable limits: `AI_DAILY_REQUESTS_PER_CUSTOMER`,
 estimated (`estimateCostUsd`) and stored in `AiUsage` for the admin dashboard.
 Lowest-capable model is the default; no uncontrolled loops.
 
+### Budget mode (percentage-of-revenue caps)
+
+On top of the request-count limits, `modules/ai/budget.ts` caps **estimated
+dollar cost** as a percentage of the subscription price — two independent caps:
+
+- **Per-customer:** each customer may spend up to `pct% × price` (default 20%
+  of $35 = **$7/mo**). Protects gross margin per customer and ensures one
+  heavy user can only exhaust their **own** share, never the pool.
+- **Pooled:** all active customers combined may spend up to
+  `pct% × price × activeCustomers` (the absolute system ceiling).
+
+At either cap, AI degrades to the free static fallback (app stays fully
+functional); caps reset monthly. Config:
+
+- `AI_BUDGET_ENABLED` (default `true`) and `AI_BUDGET_PCT` (default `20`) in env.
+- Live overrides via feature flags (no redeploy): `ai_budget_disabled` turns
+  capping off; `ai_budget_pct_<n>` (e.g. `ai_budget_pct_25`) sets the percent.
+- The admin dashboard exposes an on/off toggle, a `10/15/20/25%` dropdown, the
+  resulting per-customer and pool caps, and a live "pool used this month" meter.
+
 ## Prompt versioning (spec §25)
 
 Prompts are versioned assets in `modules/ai/prompts.ts` (`version`, `model`,

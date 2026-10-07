@@ -6,6 +6,38 @@
 
 import { prisma } from '@/lib/db';
 import { PRICE_USD } from '@/modules/billing/trial';
+import { env } from '@/lib/env';
+import { perCustomerCapUsd, poolCapUsd, budgetUsedPct } from '@/modules/ai/budget';
+
+/** Live AI budget config + usage for the admin meter. */
+export async function budgetStatus() {
+  const month = new Date().toISOString().slice(0, 7);
+  const flags = await prisma.featureFlag.findMany({
+    where: { key: { startsWith: 'ai_budget' }, enabled: true },
+  });
+  const disabled = flags.some((f) => f.key === 'ai_budget_disabled');
+  const pctFlag = flags.map((f) => /^ai_budget_pct_(\d+)$/.exec(f.key)).find(Boolean);
+  const pct = pctFlag ? Number(pctFlag[1]) : env.AI_BUDGET_PCT;
+
+  const [activeCustomers, poolSpendAgg] = await Promise.all([
+    prisma.subscription.count({ where: { status: { in: ['trialing', 'active', 'past_due'] } } }),
+    prisma.aiUsage.aggregate({ where: { month }, _sum: { estimatedCostUsd: true } }),
+  ]);
+
+  const cfg = { pct, priceUsd: PRICE_USD, activeCustomers, enabled: env.AI_BUDGET_ENABLED && !disabled };
+  const poolSpend = poolSpendAgg._sum.estimatedCostUsd ?? 0;
+  const poolCap = poolCapUsd(cfg);
+
+  return {
+    enabled: cfg.enabled,
+    pct,
+    perCustomerCapUsd: round(perCustomerCapUsd(cfg)),
+    poolCapUsd: round(poolCap),
+    poolSpendUsd: round(poolSpend),
+    poolUsedPct: budgetUsedPct(poolSpend, poolCap),
+    activeCustomers,
+  };
+}
 
 export async function overview() {
   const today = new Date().toISOString().slice(0, 10);

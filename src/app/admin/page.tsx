@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getCurrentUser, isAdminEmail } from '@/lib/auth';
-import { overview, listCustomers, listFeatureFlags, auditTrail } from '@/modules/admin/service';
+import { overview, listCustomers, listFeatureFlags, auditTrail, budgetStatus } from '@/modules/admin/service';
 import AdminClient from './AdminClient';
 
 export const dynamic = 'force-dynamic';
@@ -18,16 +18,17 @@ export default async function AdminPage() {
     );
   }
 
-  const [stats, customers, flags, audit] = await Promise.all([
+  const [stats, customers, flags, audit, budget] = await Promise.all([
     overview(),
     listCustomers(50),
     listFeatureFlags(),
     auditTrail(30),
+    budgetStatus(),
   ]);
 
   return (
     <AdminClient
-      initial={JSON.parse(JSON.stringify({ stats, customers, flags, audit }))}
+      initial={JSON.parse(JSON.stringify({ stats, customers, flags, audit, budget }))}
     />
   );
 }

@@ -14,6 +14,8 @@ const FLAGS = [
   { key: 'ai_disable_challenge_reframe', enabled: false, description: 'Disable the AI challenge capability.' },
   { key: 'notifications_kill_switch', enabled: false, description: 'Disable all outbound notifications.' },
   { key: 'human_coaching', enabled: false, description: 'Architected future capability — not in base plan.' },
+  { key: 'ai_budget_disabled', enabled: false, description: 'Turn OFF the AI budget cap entirely (live, no redeploy).' },
+  { key: 'ai_budget_pct_20', enabled: false, description: 'Override AI budget to 20% of price. Only one ai_budget_pct_* should be on.' },
 ];
 
 /** Seven synthetic personas (spec §68). Used by the AI eval harness. */

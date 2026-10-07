@@ -18,6 +18,8 @@ Copy `.env.example` → `.env` (local) or set in Vercel. Validated at startup by
 | `AI_MONTHLY_REQUESTS_PER_CUSTOMER` | yes | Cost cap per customer/month. |
 | `AI_GLOBAL_DAILY_REQUESTS` | yes | Global daily AI cap. |
 | `AI_KILL_SWITCH` | yes | `true` disables all AI immediately. |
+| `AI_BUDGET_ENABLED` | yes | `true` caps AI cost at a % of price (per-customer + pooled). |
+| `AI_BUDGET_PCT` | yes | Budget as a % of the subscription price (default 20). Live-overridable in admin. |
 | `STRIPE_SECRET_KEY` | for billing | Stripe secret key. |
 | `STRIPE_WEBHOOK_SECRET` | for billing | Webhook signing secret. |
 | `STRIPE_PRICE_ID` | for billing | The $35/mo recurring price id. |

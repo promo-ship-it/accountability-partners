@@ -15,6 +15,8 @@ import { estimateCostUsd } from './provider';
 import { MockProvider } from './providers/mock';
 import { OpenAiProvider } from './providers/openai';
 import { gateAiRequest } from './costControl';
+import { gateBudget, type BudgetConfig } from './budget';
+import { PRICE_USD } from '@/modules/billing/trial';
 import { PROMPTS, type Capability } from './prompts';
 import { checkSafety, validateJson } from './safety';
 
@@ -23,6 +25,31 @@ function makeProvider(): AiProvider {
     return new OpenAiProvider(env.AI_API_KEY!, env.AI_BASE_URL);
   }
   return new MockProvider();
+}
+
+/**
+ * Resolve the live budget config. The DB feature flag `ai_budget_disabled`
+ * can turn capping OFF live; `ai_budget_pct_<n>` flags (e.g. ai_budget_pct_25)
+ * override the percentage live — both without a redeploy. Falls back to env.
+ */
+async function resolveBudgetConfig(): Promise<BudgetConfig> {
+  const flags = await prisma.featureFlag.findMany({
+    where: { key: { startsWith: 'ai_budget' }, enabled: true },
+  });
+  const disabled = flags.some((f) => f.key === 'ai_budget_disabled');
+  const pctFlag = flags.map((f) => /^ai_budget_pct_(\d+)$/.exec(f.key)).find(Boolean);
+  const pct = pctFlag ? Number(pctFlag[1]) : env.AI_BUDGET_PCT;
+
+  const activeCustomers = await prisma.subscription.count({
+    where: { status: { in: ['trialing', 'active', 'past_due'] } },
+  });
+
+  return {
+    enabled: env.AI_BUDGET_ENABLED && !disabled,
+    pct,
+    priceUsd: PRICE_USD,
+    activeCustomers,
+  };
 }
 
 function todayKey(d = new Date()): string {
@@ -79,6 +106,23 @@ export async function runCapability(
   if (!gate.allowed) {
     const fallback = staticFallback(capability, context);
     return { ok: true, text: fallback, usedFallback: true, blocked: gate.code, correlationId };
+  }
+
+  // --- budget gate (% of revenue; per-customer + pooled) ---------------
+  const budgetCfg = await resolveBudgetConfig();
+  if (budgetCfg.enabled) {
+    const [custSpend, poolSpend] = await Promise.all([
+      prisma.aiUsage.aggregate({ where: { userId, month: monthKey() }, _sum: { estimatedCostUsd: true } }),
+      prisma.aiUsage.aggregate({ where: { month: monthKey() }, _sum: { estimatedCostUsd: true } }),
+    ]);
+    const budget = gateBudget(budgetCfg, {
+      customerMonthUsd: custSpend._sum.estimatedCostUsd ?? 0,
+      poolMonthUsd: poolSpend._sum.estimatedCostUsd ?? 0,
+    });
+    if (!budget.allowed) {
+      const fallback = staticFallback(capability, context);
+      return { ok: true, text: fallback, usedFallback: true, blocked: budget.code, correlationId };
+    }
   }
 
   // --- build + generate -------------------------------------------------

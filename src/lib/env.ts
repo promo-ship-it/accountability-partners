@@ -26,6 +26,15 @@ const schema = z.object({
     .default('false')
     .transform((v) => v === 'true'),
 
+  // Budget mode: cap AI cost at a % of the subscription price, per-customer
+  // and pooled. Default on at 20% (headroom under a 25% ceiling). The DB
+  // feature flags `ai_budget_*` override these live via the admin dashboard.
+  AI_BUDGET_ENABLED: z
+    .string()
+    .default('true')
+    .transform((v) => v === 'true'),
+  AI_BUDGET_PCT: z.coerce.number().min(0).max(100).default(20),
+
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_PRICE_ID: z.string().optional(),
